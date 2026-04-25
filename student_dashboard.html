@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student Dashboard</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Inter';
+}
+
+body{
+    min-height:100vh;
+    background:linear-gradient(135deg,#f8fafc,#e2e8f0);
+    color:#1e293b;
+}
+
+/* HEADER */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px 30px;
+    background:white;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);
+    position:sticky;
+    top:0;
+}
+
+.logo{
+    font-size:20px;
+    font-weight:600;
+    color:#2563eb;
+}
+
+.nav{
+    display:flex;
+    gap:15px;
+}
+
+.nav a{
+    text-decoration:none;
+    color:#475569;
+    padding:8px 14px;
+    border-radius:8px;
+    transition:0.3s;
+}
+
+.nav a:hover{
+    background:#2563eb;
+    color:white;
+}
+
+.main{
+    padding:30px;
+}
+
+.topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+.search{
+    padding:10px;
+    width:260px;
+    border-radius:10px;
+    border:1px solid #cbd5e1;
+}
+
+/* TABLE */
+.table-container{
+    background:white;
+    border-radius:12px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.05);
+    overflow:hidden;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    padding:14px;
+    border-bottom:1px solid #e2e8f0;
+    text-align:left;
+}
+
+th{
+    background:#f1f5f9;
+    cursor:pointer;
+}
+
+tr:hover{
+    background:#f8fafc;
+}
+
+button{
+    padding:6px 10px;
+    border:none;
+    border-radius:6px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+}
+
+.tag{
+    background:#e0e7ff;
+    color:#3730a3;
+    padding:3px 8px;
+    border-radius:6px;
+    font-size:11px;
+}
+
+.logo-img{
+    width:24px;
+    height:24px;
+    margin-right:6px;
+}
+
+.status{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:12px;
+}
+
+.selected{background:#dcfce7;color:#166534;}
+.rejected{background:#fee2e2;color:#991b1b;}
+.pending{background:#fef9c3;color:#854d0e;}
+
+.pagination{
+    display:flex;
+    justify-content:center;
+    margin-top:10px;
+    gap:5px;
+}
+
+.page-btn{
+    padding:5px 10px;
+    border:none;
+    background:#e2e8f0;
+    border-radius:5px;
+}
+
+.page-btn.active{
+    background:#2563eb;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div class="logo">🎓 Placement Portal</div>
+    <div class="nav">
+        <a href="#" onclick="showSection('home')">Home</a>
+        <a href="#" onclick="showSection('jobs')">Jobs</a>
+        <a href="#" onclick="showSection('applications')">Applications</a>
+        <a href="#" onclick="showSection('saved')">Saved</a>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+</div>
+
+<div class="main">
+
+<div class="topbar">
+    <h2 id="welcome"></h2>
+    <input class="search" placeholder="Search jobs..." onkeyup="searchJobs(this.value)">
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:15px;">
+    <select onchange="filterJobs(this.value)">
+        <option value="">All Companies</option>
+        <option value="Google">Google</option>
+        <option value="Amazon">Amazon</option>
+        <option value="TCS">TCS</option>
+    </select>
+
+    <select onchange="filterLocation(this.value)">
+        <option value="">All Locations</option>
+        <option value="Bangalore">Bangalore</option>
+        <option value="Hyderabad">Hyderabad</option>
+    </select>
+</div>
+
+<div id="homeSection">
+    <p><b>Name:</b> <span id="name"></span></p>
+    <p><b>Email:</b> <span id="email"></span></p>
+</div>
+
+<div id="jobsSection" style="display:none;">
+    <div id="jobList"></div>
+</div>
+
+<div id="appSection" style="display:none;">
+    <div id="applications"></div>
+</div>
+
+<div id="savedSection" style="display:none;">
+    <div id="savedJobs"></div>
+</div>
+
+</div>
+
+<script>
+
+const userId = localStorage.getItem("user_id");
+const name = localStorage.getItem("user_name");
+const email = localStorage.getItem("user_email");
+
+document.getElementById("name").textContent = name;
+document.getElementById("email").textContent = email;
+document.getElementById("welcome").textContent = "Welcome, " + name;
+
+let allJobs = [];
+let currentJobs = [];
+let currentPage = 1;
+let sortAsc = true;
+const rowsPerPage = 5;
+
+function showSection(s){
+    homeSection.style.display="none";
+    jobsSection.style.display="none";
+    appSection.style.display="none";
+    savedSection.style.display="none";
+
+    if(s==="home") homeSection.style.display="block";
+    if(s==="jobs"){ jobsSection.style.display="block"; loadJobs(); }
+    if(s==="applications"){ appSection.style.display="block"; loadApplications(); }
+    if(s==="saved"){ savedSection.style.display="block"; loadSavedJobs(); }
+}
+
+async function loadJobs(){
+    const res = await fetch("/api/jobs");
+    allJobs = await res.json();
+    renderJobs(allJobs);
+}
+
+function renderJobs(jobs){
+    currentJobs = jobs;
+
+    const start = (currentPage-1)*rowsPerPage;
+    const pageJobs = jobs.slice(start,start+rowsPerPage);
+
+    let html = `<div class="table-container"><table>
+    <tr>
+        <th onclick="sortJobs('title')">Title</th>
+        <th onclick="sortJobs('company')">Company</th>
+        <th onclick="sortJobs('location')">Location</th>
+        <th>Resume</th>
+        <th>Action</th>
+    </tr>`;
+
+    pageJobs.forEach(j=>{
+        const logo=`https://logo.clearbit.com/${j.company.toLowerCase()}.com`;
+
+        html+=`
+        <tr>
+            <td>${j.title}</td>
+            <td><img class="logo-img" src="${logo}">${j.company}</td>
+            <td>${j.location}</td>
+            <td><input type="file" id="resume_${j.id}"></td>
+            <td>
+                <button onclick="apply(${j.id})">Apply</button>
+            </td>
+        </tr>`;
+    });
+
+    html+=`</table></div>`;
+    html+=pagination(jobs.length);
+
+    jobList.innerHTML=html;
+}
+
+function pagination(total){
+    let pages=Math.ceil(total/rowsPerPage);
+    let html=`<div class="pagination">`;
+
+    for(let i=1;i<=pages;i++){
+        html+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="changePage(${i})">${i}</button>`;
+    }
+
+    html+=`</div>`;
+    return html;
+}
+
+function changePage(p){
+    currentPage=p;
+    renderJobs(currentJobs);
+}
+
+function sortJobs(field){
+    sortAsc=!sortAsc;
+    currentJobs.sort((a,b)=> a[field]>b[field]? (sortAsc?1:-1):(sortAsc?-1:1));
+    renderJobs(currentJobs);
+}
+
+function searchJobs(q){
+    renderJobs(allJobs.filter(j=> j.title.toLowerCase().includes(q.toLowerCase())));
+}
+
+function filterJobs(c){
+    if(!c) renderJobs(allJobs);
+    else renderJobs(allJobs.filter(j=>j.company===c));
+}
+
+function filterLocation(l){
+    if(!l) renderJobs(allJobs);
+    else renderJobs(allJobs.filter(j=>j.location===l));
+}
+
+/* ✅ FIXED APPLY FUNCTION */
+async function apply(jobId){
+    const file = document.getElementById(`resume_${jobId}`).files[0];
+
+    if(!file){
+        alert("Please upload resume first");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("student_id", userId);
+    formData.append("job_id", jobId);
+    formData.append("resume", file);
+
+    try{
+        const res = await fetch("/api/apply", {
+            method:"POST",
+            body:formData
+        });
+
+        const data = await res.json();
+
+        if(res.ok){
+            alert("Applied successfully!");
+        }else{
+            alert(data.error || "Apply failed");
+        }
+
+    }catch(err){
+        alert("Server error");
+    }
+}
+
+async function loadApplications(){
+    const res = await fetch(`/api/my-apps/${userId}`);
+    const apps = await res.json();
+
+    let html=`<div class="table-container"><table>
+    <tr><th>Job</th><th>Status</th></tr>`;
+
+    apps.forEach(a=>{
+        let cls="pending";
+        if(a.status==="Selected") cls="selected";
+        if(a.status==="Rejected") cls="rejected";
+
+        html+=`<tr>
+        <td>${a.job__title}</td>
+        <td><span class="status ${cls}">${a.status}</span></td>
+        </tr>`;
+    });
+
+    html+=`</table></div>`;
+    applications.innerHTML=html;
+}
+
+async function loadSavedJobs(){
+    const res = await fetch(`/api/saved/${userId}`);
+    const jobs = await res.json();
+
+    let html=`<div class="table-container"><table>
+    <tr><th>Title</th><th>Company</th></tr>`;
+
+    jobs.forEach(j=>{
+        html+=`<tr><td>${j.title}</td><td>${j.company}</td></tr>`;
+    });
+
+    html+=`</table></div>`;
+    savedJobs.innerHTML=html;
+}
+
+function logout(){
+    localStorage.clear();
+    location.href="/";
+}
+
+showSection("home");
+
+</script>
+
+</body>
+</html>
